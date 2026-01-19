@@ -1,5 +1,6 @@
 # CSE 160: Computer Graphics Repository
 ## Assignment 0: Vector Library
 - Creating object oridented graphics projects in Javascript
-- Drawing canvas element using a 2D context
-- Review fundamental concepts of Linear Algebra
+
+## Assignment 1: Painting
+- Creating a web application to draw simple geometric shapes made out of points and triangles
