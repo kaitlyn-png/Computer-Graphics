@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Draw color points</title>
+        <link rel="stylesheet" href="asg1.css" />
+    </head>
+
+    <body onload="main()">
+        <div id = "main">
+            <div id = "canvasAndImageContainer">
+                <canvas id="webgl" width="400" height="400">
+                Please use a browser that supports "canvas"
+                </canvas>
+                <img id="catImage" src="cat.png" style="display: none; width: 400px; height: 400px; border: 1px solid black; margin-left: 20px;">
+            </div>
+            <div id = "topContainer">
+                <button type="button" id="clearButton">Clear</button>
+                <button id="exportButton"> Export </button>
+                <button id="generateButton"> Generate </button>
+            </div>
+
+            <div id = "modeContainer">
+                <p id = "modeLabel"> Drawing Mode: </p>
+                <button type="button" id="pointButton">Point</button>
+                <button type="button" id="triangleButton">Triangle</button>
+                <button type="button" id="circleButton">Circle</button>
+            </div>
+
+            <div id = "sizeContainer">
+                <p id = "sizeLabel"> Size: <input type="range" min="5" max="80" value="5" class="slider" id="sizeSlide"> </p>
+            </div>
+
+            <div id = "colorContainer"> 
+                <p id = "colorLabel"> Color Selection: </p>
+                <p id = "red"> Red <input type="range" min="0" max="100" value="100" class="slider" id="redSlide"> </p>
+                <p id = "green"> Green <input type="range" min="0" max="100" value="0" class="slider" id="greenSlide"> </p>
+                <p id = "blue"> Blue <input type="range" min="0" max="100" value="0" class="slider" id="blueSlide"> </p>
+                <p id = "alpha"> Alpha <input type="range" min="0" max="100" value="100" class="slider" id="alphaSlide"> </p>
+            </div>
+
+            <div id = "rotateContainer">
+                <p id = "triangleMODLabel"> Triangle: </p>
+                <p id = "rotateLabel"> Rotate: <input type="range" min="0" max="360" value="0" class="slider" id="rotateSlide"> </p>
+            </div>
+
+            <div id = "segmentsContainer"> 
+                <p id = "circleMODLabel"> Circle: </p>
+                <p id = "segmentsLabel"> Segments <input type="range" min="10" max="40" value="10" class="slider" id="segmentsSlide"> </p>
+            </div>
+        </div>
+
+        
+        <script src="../lib/webgl-utils.js"></script>
+        <script src="../lib/webgl-debug.js"></script>
+        <script src="../lib/cuon-utils.js"></script>
+        <script src="Point.js"></script>
+        <script src="Triangle.js"></script>
+        <script src="Circle.js"></script>
+        <script src="asg1.js"></script>
+        <script src="generate.js"></script>
+    </body>
+</html>
