@@ -1,0 +1,23 @@
+#main {
+  text-align: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+  height: 100vh;
+}
+button{
+    cursor: pointer;
+    background-color: white;
+    border-radius: 10px;
+    border: 1px solid black;
+    padding: 5px 10px;
+}
+button:hover{
+    background-color: lightgray;
+}
+
+#exportContainer{
+    margin-top: 10px;
+}

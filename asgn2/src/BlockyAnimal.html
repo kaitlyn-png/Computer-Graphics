@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Draw color points</title>
+        <link rel="stylesheet" href="BlockyAnimal.css" />
+    </head>
+
+    <body onload="main()">
+        <div id = "main">
+            <div id = "canvasAndImageContainer">
+                <canvas id="webgl" width="800" height="800">
+                Please use a browser that supports "canvas"
+                </canvas>
+            </div>
+
+
+            <div id = "slidersContainers">
+                <div id = "stats">
+                    <p id = "numdot"></p>
+                </div>
+                <div id = "angleContainer">
+                    <p id = "angleSideLabel"> Side Angle: <input type="range" min="0" max="360" value="0" class="slider" id="angleSideSlide"> </p>
+                    <p id = "angleUpLabel"> Top Angle: <input type="range" min="0" max="360" value="0" class="slider" id="angleUpSlide"> </p>
+                </div>
+
+                <div id = "rotateContainer">
+                    <p id = "leftLegLabel"> Left Leg: <input type="range" min="-7" max="7" value="0" class="slider" id="leftLegSlide"> </p>
+                    <p id = "rightLegLabel"> Right Leg: <input type="range" min="-7" max="7" value="0" class="slider" id="rightLegSlide"> </p>
+                    <p id = "leftFootLabel"> Left Foot: <input type="range" min="-10" max="10" value="0" class="slider" id="leftFootSlide"> </p>
+                    <p id = "rightFootLabel"> Right Foot: <input type="range" min="-10" max="10" value="0" class="slider" id="rightFootSlide"> </p>
+                </div>
+
+                <div id = "animationContainer">
+                    Animation:
+                    <button type = "button" id = "animationOnButton">ON</button>
+                    <button type = "button" id = "animationOffButton">OFF</button>
+                </div>
+                
+                <div id = "exportContainer">
+                    <button id="exportButton"> Export </button>
+                </div>
+            </div>
+        </div>
+
+        
+        <script src="../lib/webgl-utils.js"></script>
+        <script src="../lib/webgl-debug.js"></script>
+        <script src="../lib/cuon-utils.js"></script>
+        <script src="../lib/cuon.matrix.js"></script>
+        <script src="Point.js"></script>
+        <script src="Triangle.js"></script>
+        <script src="Circle.js"></script>
+        <script src="Cube.js"></script>
+        <script src="Cylinder.js"></script>
+        <script src="BlockyAnimal.js"></script>
+    </body>
+</html>
