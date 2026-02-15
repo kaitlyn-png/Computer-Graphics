@@ -1,0 +1,25 @@
+#main {
+    text-align: center;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    gap: 20px;
+    height: 98vh;
+    width: 100%;
+    overflow: hidden;
+}
+#stats {
+    text-align: center;
+    display: flex;
+    justify-content: center;
+}
+#itemCounter {
+    color: white;
+    font-size: 20px;
+    position: fixed;
+    top: 40px;
+    left: 40px;
+}

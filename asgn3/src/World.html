@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>World</title>
+        <link rel="stylesheet" href="World.css" />
+    </head>
+
+    <body onload="main()">
+        <div id = "main">
+            <div id = "canvasAndImageContainer">
+                <canvas id="webgl" width="1920" height="1080">
+                Please use a browser that supports "canvas"
+                </canvas>
+            </div>
+        </div>
+
+        <div id="stats">
+            <p id="numdot"></p>
+            <p id="itemCounter">Logs: 0/10 | Hay: 0/4</p>
+        </div>
+
+        <script src="../lib/webgl-utils.js"></script>
+        <script src="../lib/webgl-debug.js"></script>
+        <script src="../lib/cuon-utils.js"></script>
+        <script src="../lib/cuon.matrix.js"></script>
+        <script src="Camera.js"></script>
+        <script src="Point.js"></script>
+        <script src="Triangle.js"></script>
+        <script src="Circle.js"></script>
+        <script src="Cube.js"></script>
+        <script src="Cylinder.js"></script>
+        <script src="World.js"></script>
+    </body>
+</html>
