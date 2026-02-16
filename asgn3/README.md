@@ -1,3 +1,12 @@
-# Assignment 3: Creating a Virtual World
-## Objectives:
-To create a virtual world using textured cubes and explore it using a perspective camera.
+# Minecraft Simulator
+## Objective:
+Break 10 logs and 4 hay barrels to complete the game!
+## Controls:
+WASD: to move forwards, left, back, right
+Q: pan left
+E: pan right
+R: place blocks
+F: destroy blocks
+1: switch to grass blocks
+2: switch to log blocks
+3: switch to hay blocks
