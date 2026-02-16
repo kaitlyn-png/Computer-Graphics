@@ -96,7 +96,10 @@ let g_texture7;
 let g_camera;
 
 const MAP_SIZE = 32;
-const MAX_WALL_HEIGHT = 4;
+const MAX_WALL_HEIGHT = 16;
+const BLOCK_GRASS = 'Grass';
+const BLOCK_LOG = 'Log';
+const BLOCK_HAY = 'Hay';
 
 // ROTATING VARIABLES
 let g_globalSideAngle = 0;
@@ -104,12 +107,15 @@ let g_globalUpAngle = 0;
 let g_mouseDown = false;
 let g_lastMouseX = 0;
 let g_lastMouseY = 0;
+let g_pointerLocked = false;
 
 // COLLECTION SYSTEM VARIABLES
 let g_logsCollected = 0;
 let g_hayCollected = 0;
 const LOGS_NEEDED = 10;
 const HAY_NEEDED = 4;
+let g_selectedPlaceBlockType = BLOCK_GRASS;
+let g_blockTypes = [BLOCK_GRASS, BLOCK_LOG, BLOCK_HAY];
 
 document.onmouseup = function () {
   g_mouseDown = false;
@@ -120,10 +126,13 @@ function setupWebGL() {
   canvas = document.getElementById('webgl');
 
   // Mouse functions
+  canvas.oncontextmenu = function(ev) { ev.preventDefault(); };
   canvas.onmousedown = onMouseDown;
-  canvas.onmousemove = onMouseMove;
+  canvas.onclick = lockPointer;
   canvas.onmouseenter = onMouseEnter;
   canvas.onmouseleave = onMouseLeave;
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('pointerlockchange', onPointerLockChange);
   
   // Get the rendering context for WebGL
   gl = canvas.getContext("webgl", { preserveDrawingBuffer: true });
@@ -393,18 +402,11 @@ function updateAnimationAngles() {
 }
 
 function onMouseDown(ev) {
+  if (ev.button !== 0) return;
   g_mouseDown = true;
   g_lastMouseX = ev.clientX;
   g_lastMouseY = ev.clientY;
-
-  // // Left click to delete block
-  // if (ev.button === 0) {
-  //   deleteBlock();
-  // }
-  // // Right click to add block
-  // else if (ev.button === 2) {
-  //   addBlock();
-  // }
+  lockPointer();
 }
 
 function onMouseLeave(ev){
@@ -417,14 +419,28 @@ function onMouseEnter(ev){
 }
 
 function onMouseMove(ev) {
-  // Camera look controls when mouse is down
-  if (g_mouseDown && g_camera) {
-    let dx = ev.clientX - g_lastMouseX;
-    g_camera.look(dx, 0);
+  // Pointer lock controls for camera position
+  if (g_camera && g_pointerLocked) {
+    let dx = ev.movementX || 0;
+    let dy = ev.movementY || 0;
+    g_camera.look(dx, dy);
     g_globalSideAngle = g_camera.yaw;
     g_globalUpAngle = g_camera.pitch;
-    g_lastMouseX = ev.clientX;
   }
+
+  g_lastMouseX = ev.clientX;
+  g_lastMouseY = ev.clientY;
+}
+
+function lockPointer() {
+  if (!canvas) return;
+  if (document.pointerLockElement !== canvas) {
+    canvas.requestPointerLock();
+  }
+}
+
+function onPointerLockChange() {
+  g_pointerLocked = (document.pointerLockElement === canvas);
 }
 
 function keydown(ev) {
@@ -442,116 +458,84 @@ function keydown(ev) {
     g_camera.turnLeft();
   } else if (ev.keyCode == 69) { // E
     g_camera.turnRight();
-  } else if (ev.keyCode == 70) { // F - delete block
-    deleteBlock();
-  } else if (ev.keyCode == 82) { // R - add block
-    addBlock();
+  } else if (ev.keyCode == 49) { // 1 - grass
+    g_selectedPlaceBlockType = BLOCK_GRASS;
+  } else if (ev.keyCode == 50) { // 2 - log
+    g_selectedPlaceBlockType = BLOCK_LOG;
+  } else if (ev.keyCode == 51) { // 3 - hay
+    g_selectedPlaceBlockType = BLOCK_HAY;
+  } else if (ev.keyCode == 70 || ev.keyCode == 82) { // F / R
+    var isDestroy = (ev.keyCode == 70);
+    var origin = g_camera.position;
+    var dir = g_camera.front;
+    var maxDistance = 10;
+    var step = 0.05;
+    var hitCell = null;
+    var firstInBoundsCell = null;
+
+    for (var dist = 0.0; dist < maxDistance; dist += step) {
+      var x = origin[0] + dir[0] * dist;
+      var y = origin[1] + dir[1] * dist;
+      var z = origin[2] + dir[2] * dist;
+
+      var blockX = Math.floor(x + MAP_SIZE / 2);
+      var blockZ = Math.floor(z + MAP_SIZE / 2);
+      var blockY = Math.floor(y);
+
+      if (blockX < 0 || blockX >= MAP_SIZE || blockZ < 0 || blockZ >= MAP_SIZE) {
+        continue;
+      }
+
+      if (blockY < 0 || blockY >= MAX_WALL_HEIGHT) {
+        continue;
+      }
+
+      if (!firstInBoundsCell) {
+        firstInBoundsCell = { x: blockX, z: blockZ };
+      }
+
+      var heightAtCell = getMapHeight(blockX, blockZ);
+      if (blockY < heightAtCell) {
+        hitCell = { x: blockX, z: blockZ };
+        break;
+      }
+    }
+
+    if (isDestroy) {
+      if (hitCell) {
+        var destroyHeight = getMapHeight(hitCell.x, hitCell.z);
+        if (destroyHeight > 0) {
+          var topY = destroyHeight - 1;
+          var destroyedType = getBlockTypeAt(hitCell.x, hitCell.z, topY);
+
+          if (destroyedType === BLOCK_LOG) {
+            g_logsCollected++;
+            console.log('Log collected! Total: ' + g_logsCollected);
+          } else if (destroyedType === BLOCK_HAY) {
+            g_hayCollected++;
+            console.log('Hay collected! Total: ' + g_hayCollected);
+          }
+
+          setBlockTypeAt(hitCell.x, hitCell.z, topY, null);
+          g_map[hitCell.x][hitCell.z] = destroyHeight - 1;
+          console.log('Destroyed block at map (' + hitCell.x + ', ' + hitCell.z + '), new height: ' + g_map[hitCell.x][hitCell.z]);
+          checkGameCompletion();
+        }
+      }
+    } else {
+      var placeCell = hitCell || firstInBoundsCell;
+      if (placeCell) {
+        var placeHeight = getMapHeight(placeCell.x, placeCell.z);
+        if (placeHeight < MAX_WALL_HEIGHT) {
+          setBlockTypeAt(placeCell.x, placeCell.z, placeHeight, g_selectedPlaceBlockType);
+          g_map[placeCell.x][placeCell.z] = placeHeight + 1;
+          console.log('Placed ' + g_selectedPlaceBlockType + ' block at map (' + placeCell.x + ', ' + placeCell.z + '), new height: ' + g_map[placeCell.x][placeCell.z]);
+        }
+      }
+    }
   }
 
   renderScene();
-}
-
-// Find the map block directly in front of the camera
-function getBlockInFront() {
-  if (!g_camera) return null;
-  
-  // Look 1 units in front of the camera
-  var distance = 1;
-  var pos = g_camera.position;
-  var front = g_camera.front;
-  
-  var x = pos[0] + front[0] * distance;
-  var y = pos[1] + front[1] * distance;
-  var z = pos[2] + front[2] * distance;
-  
-  // Convert world coordinates to map coordinates
-  var blockX = Math.round(x + MAP_SIZE / 2);
-  var blockZ = Math.round(z + MAP_SIZE / 2);
-  
-  // Check bounds
-  if (blockX < 0 || blockX >= MAP_SIZE || blockZ < 0 || blockZ >= MAP_SIZE) {
-    console.log('Block in front is out of bounds');
-    return null;
-  }
-  
-  return { x: blockX, z: blockZ };
-}
-
-// Raycast to find block where camera is looking
-function getBlockWhereLooking() {
-  if (!g_camera) return null;
-  
-  var origin = g_camera.position;
-  var dir = g_camera.front;
-  
-  var maxDistance = 10;
-  var step = 0.1;
-  
-  for (var dist = 0.5; dist < maxDistance; dist += step) {
-    var x = origin[0] + dir[0] * dist;
-    var y = origin[1] + dir[1] * dist;
-    var z = origin[2] + dir[2] * dist;
-    
-    var blockX = Math.floor(x + MAP_SIZE / 2);
-    var blockZ = Math.floor(z + MAP_SIZE / 2);
-    var blockY = Math.floor(y);
-    
-    // Check bounds
-    if (blockX < 0 || blockX >= MAP_SIZE || blockZ < 0 || blockZ >= MAP_SIZE) {
-      continue;
-    }
-    
-    // Check if there's a block at this position
-    var height = g_map[blockZ][blockX];
-    if (blockY >= 0 && blockY < height) {
-      return { x: blockX, z: blockZ, y: blockY };
-    }
-  }
-  
-  return null;
-}
-
-// Add a block where the camera is looking
-function addBlock() {
-  var block = getBlockWhereLooking();
-  if (!block) return;
-  
-  var currentHeight = g_map[block.z][block.x];
-  
-  if (currentHeight < MAX_WALL_HEIGHT) {
-    g_map[block.z][block.x] = currentHeight + 1;
-    console.log('Added block at map (' + block.x + ', ' + block.z + '), new height: ' + g_map[block.z][block.x]);
-  } else {
-    console.log('Max height reached at (' + block.x + ', ' + block.z + ')');
-  }
-}
-
-// Delete a block where the camera is looking
-function deleteBlock() {
-  var block = getBlockWhereLooking();
-  if (!block) return;
-  
-  var currentHeight = g_map[block.z][block.x];
-  
-  // Check block type before deleting for collection system
-  if (currentHeight === 3) {
-    g_logsCollected++;
-    console.log('Log collected! Total: ' + g_logsCollected);
-  } else if (currentHeight === 4) {
-    g_hayCollected++;
-    console.log('Hay collected! Total: ' + g_hayCollected);
-  }
-  
-  // Decrease height at this location
-  if (currentHeight > 0) {
-    g_map[block.z][block.x] = currentHeight - 1;
-    console.log('Deleted block at map (' + block.x + ', ' + block.z + '), new height: ' + g_map[block.z][block.x]);
-  } else {
-    console.log('No block to delete at (' + block.x + ', ' + block.z + ')');
-  }
-  
-  // Check if game is won
-  checkGameCompletion();
 }
 
 // Function to check if player has collected enough items
@@ -603,6 +587,8 @@ function resetWorld() {
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
   ];
+
+  initializeBlockTypesFromHeightMap();
 }
 
 // 2D height map for the world
@@ -641,22 +627,69 @@ var g_map = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ];
 
+initializeBlockTypesFromHeightMap();
+
+function getDefaultTypeForHeight(height) {
+  if (height >= 3) return BLOCK_LOG;
+  if (height === 2) return BLOCK_HAY;
+  return BLOCK_GRASS;
+}
+
+function initializeBlockTypesFromHeightMap() {
+  g_blockTypes = [];
+
+  for (let x = 0; x < MAP_SIZE; x++) {
+    g_blockTypes[x] = [];
+    for (let z = 0; z < MAP_SIZE; z++) {
+      g_blockTypes[x][z] = [];
+      var height = getMapHeight(x, z);
+      var defaultType = getDefaultTypeForHeight(height);
+
+      for (let y = 0; y < height; y++) {
+        g_blockTypes[x][z][y] = defaultType;
+      }
+    }
+  }
+}
+
+function getBlockTypeAt(x, z, y) {
+  if (!g_blockTypes[x] || !g_blockTypes[x][z]) {
+    return BLOCK_GRASS;
+  }
+  return g_blockTypes[x][z][y] || BLOCK_GRASS;
+}
+
+function setBlockTypeAt(x, z, y, blockType) {
+  if (!g_blockTypes[x]) {
+    g_blockTypes[x] = [];
+  }
+  if (!g_blockTypes[x][z]) {
+    g_blockTypes[x][z] = [];
+  }
+  g_blockTypes[x][z][y] = blockType;
+}
+
+function getTexturesForBlockType(blockType) {
+  if (blockType === BLOCK_LOG) {
+    return { top: 4, side: 3 };
+  }
+  if (blockType === BLOCK_HAY) {
+    return { top: 7, side: 6 };
+  }
+  return { top: 1, side: 5 };
+}
+
 function drawMap(){
   for (let x = 0; x < g_map.length; x++){
     for (let z = 0; z < g_map[x].length; z++){
       var height = getMapHeight(x, z);
       for (let y = 0; y < height; y++){
         var wall = new Cube();
-        wall.color = [1.0, 1.0, 1.0, 1.0];        
+        wall.color = [1.0, 1.0, 1.0, 1.0];
         wall.matrix.translate(x - MAP_SIZE / 2, y, z - MAP_SIZE / 2);
-        if (height >= 3) {
-          wall.renderWithFaceTextures(4, 3);
-        } else if (height == 2) {
-          wall.renderWithFaceTextures(7, 6);
-        }
-        else {
-          wall.renderWithFaceTextures(1, 5);
-        }
+        var blockType = getBlockTypeAt(x, z, y);
+        var textures = getTexturesForBlockType(blockType);
+        wall.renderWithFaceTextures(textures.top, textures.side);
       }
     }
   }
@@ -767,6 +800,9 @@ function renderScene(){
 function updateItemCounter() {
   var counterText = "Logs: " + g_logsCollected + "/" + LOGS_NEEDED + " | Hay: " + g_hayCollected + "/" + HAY_NEEDED;
   sendTextToHTML(counterText, "itemCounter");
+
+  var selectedText = "Selected: " + g_selectedPlaceBlockType + " (1=Grass, 2=Log, 3=Hay) | R: Place | F: Destroy";
+  sendTextToHTML(selectedText, "controlHint");
 }
 
 // Set the text of an HTML element

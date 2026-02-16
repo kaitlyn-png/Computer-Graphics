@@ -18,9 +18,9 @@ class Camera {
 
     moveForward() {
         let f = [
-            this.at[0] - this.eye[0],
-            this.at[1] - this.eye[1],
-            this.at[2] - this.eye[2]
+            this.front[0],
+            0,
+            this.front[2]
         ];
         f = this.normalize(f);
         
@@ -28,16 +28,16 @@ class Camera {
         f = this.scale(f, speed);
         
         this.eye = this.add(this.eye, f);
-        this.at = this.add(this.at, f);
         
         this.clampPosition();
+        this.updateAtFromAngles();
     }
 
     moveBackward() {
         let b = [
-            this.eye[0] - this.at[0],
-            this.eye[1] - this.at[1],
-            this.eye[2] - this.at[2]
+            -this.front[0],
+            0,
+            -this.front[2]
         ];
         b = this.normalize(b);
         
@@ -45,16 +45,16 @@ class Camera {
         b = this.scale(b, speed);
         
         this.eye = this.add(this.eye, b);
-        this.at = this.add(this.at, b);
         
         this.clampPosition();
+        this.updateAtFromAngles();
     }
 
     moveLeft() {
         let f = [
-            this.at[0] - this.eye[0],
-            this.at[1] - this.eye[1],
-            this.at[2] - this.eye[2]
+            this.front[0],
+            0,
+            this.front[2]
         ];
         f = this.normalize(f);
         
@@ -65,16 +65,16 @@ class Camera {
         s = this.scale(s, speed);
         
         this.eye = this.add(this.eye, s);
-        this.at = this.add(this.at, s);
         
         this.clampPosition();
+        this.updateAtFromAngles();
     }
 
     moveRight() {
         let f = [
-            this.at[0] - this.eye[0],
-            this.at[1] - this.eye[1],
-            this.at[2] - this.eye[2]
+            this.front[0],
+            0,
+            this.front[2]
         ];
         f = this.normalize(f);
         
@@ -85,55 +85,19 @@ class Camera {
         s = this.scale(s, speed);
         
         this.eye = this.add(this.eye, s);
-        this.at = this.add(this.at, s);
         
         this.clampPosition();
+        this.updateAtFromAngles();
     }
 
     panLeft() {
-        let f = [
-            this.at[0] - this.eye[0],
-            this.at[1] - this.eye[1],
-            this.at[2] - this.eye[2]
-        ];
-        
-        let alpha = 2; // degrees
-        let rotationMatrix = new Matrix4();
-        rotationMatrix.setRotate(alpha, this.up[0], this.up[1], this.up[2]);
-        
-        let fVec = new Vector3(f);
-        let fPrime = rotationMatrix.multiplyVector3(fVec);
-        
-        this.at = [
-            this.eye[0] + fPrime.elements[0],
-            this.eye[1] + fPrime.elements[1],
-            this.eye[2] + fPrime.elements[2]
-        ];
-        
-        this.updateMatrices();
+        this.yaw -= 2;
+        this.updateAtFromAngles();
     }
 
     panRight() {
-        let f = [
-            this.at[0] - this.eye[0],
-            this.at[1] - this.eye[1],
-            this.at[2] - this.eye[2]
-        ];
-        
-        let alpha = -2; // degrees
-        let rotationMatrix = new Matrix4();
-        rotationMatrix.setRotate(alpha, this.up[0], this.up[1], this.up[2]);
-        
-        let fVec = new Vector3(f);
-        let fPrime = rotationMatrix.multiplyVector3(fVec);
-        
-        this.at = [
-            this.eye[0] + fPrime.elements[0],
-            this.eye[1] + fPrime.elements[1],
-            this.eye[2] + fPrime.elements[2]
-        ];
-        
-        this.updateMatrices();
+        this.yaw += 2;
+        this.updateAtFromAngles();
     }
 
     turnLeft() {
@@ -145,26 +109,32 @@ class Camera {
     }
 
     look(deltaX, deltaY) {
-        if (deltaX > 0) {
-            for (let i = 0; i < Math.abs(deltaX) * 0.1; i++) {
-                this.panRight();
-            }
-        } else if (deltaX < 0) {
-            for (let i = 0; i < Math.abs(deltaX) * 0.1; i++) {
-                this.panLeft();
-            }
+        var sensitivity = 0.1;
+        if (deltaX !== 0) {
+            this.yaw += deltaX * sensitivity;
         }
-        
-        // cannot look underground 
         if (deltaY !== 0) {
-            let speed = 0.01;
-            this.eye[1] += deltaY * speed;
-            this.eye[1] = Math.max(0.5, this.eye[1]);
-            if (this.bounds) {
-                this.eye[1] = Math.min(this.bounds.maxY, this.eye[1]);
-            }
+            this.pitch -= deltaY * sensitivity;
+            this.pitch = Math.max(-89, Math.min(89, this.pitch));
         }
-        
+
+        this.updateAtFromAngles();
+    }
+
+    updateAtFromAngles() {
+        var radYaw = this.yaw * Math.PI / 180;
+        var radPitch = this.pitch * Math.PI / 180;
+
+        var frontX = Math.cos(radYaw) * Math.cos(radPitch);
+        var frontY = Math.sin(radPitch);
+        var frontZ = Math.sin(radYaw) * Math.cos(radPitch);
+
+        this.at = [
+            this.eye[0] + frontX,
+            this.eye[1] + frontY,
+            this.eye[2] + frontZ
+        ];
+
         this.updateMatrices();
     }
 
@@ -217,8 +187,6 @@ class Camera {
         this.eye[0] = Math.max(this.bounds.minX, Math.min(this.bounds.maxX, this.eye[0]));
         this.eye[1] = Math.max(this.bounds.minY, Math.min(this.bounds.maxY, this.eye[1]));
         this.eye[2] = Math.max(this.bounds.minZ, Math.min(this.bounds.maxZ, this.eye[2]));
-        
-        this.updateMatrices();
     }
 
     add(a, b) {

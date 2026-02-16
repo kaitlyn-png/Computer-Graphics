@@ -2,9 +2,9 @@
 
 Game: have to break at least 10 logs and 4 hay to complete the game --> resets
 
-WHERE THE MOUSE LOOKS IS WHERE THE BLOCKS WILL BREAK AND BE PLACED --> need to use raycasting
+WHERE THE MOUSE LOOKS IS WHERE THE BLOCKS WILL BREAK AND BE PLACED
 
-Camera movement: able to look up and down without it scaling weirdly like you are in the air --> keep X axis while looking up and down like a minecraft character
+Camera movement: able to look up and down without it scaling weirdly like you are in the air --> keep X axis while looking up and down like a minecraft character --> pointer, center of screen is where the player is looking at, locks your crosshair
 
 Fix sky texture
 

@@ -11,15 +11,46 @@
     width: 100%;
     overflow: hidden;
 }
+
+#canvasAndImageContainer {
+    position: relative;
+    display: inline-block;
+}
+
+#centerCursor {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 10;
+}
+
 #stats {
     text-align: center;
     display: flex;
     justify-content: center;
+}
+#objective {
+    color: white;
+    font-size: 22px;
+    position: fixed;
+    top: 12px;
+    left: 40px;
 }
 #itemCounter {
     color: white;
     font-size: 20px;
     position: fixed;
     top: 40px;
+    left: 40px;
+}
+#controlHint {
+    color: white;
+    font-size: 18px;
+    position: fixed;
+    top: 72px;
     left: 40px;
 }
