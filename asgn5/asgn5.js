@@ -11,9 +11,34 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {OBJLoader} from 'three/addons/loaders/OBJLoader.js';
 import {MTLLoader} from 'three/addons/loaders/MTLLoader.js';
-import { VertexNormalsHelper } from 'three/addons/helpers/VertexNormalsHelper.js';
 
 function main(){
+        // WASD and fly movement state
+        const moveState = { w: false, a: false, s: false, d: false, space: false, shift: false };
+        const moveSpeed = 0.25;
+
+        // Listen for WASD keydown/up, but ignore if sitting
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'e' || e.key === 'E') return;
+            if (isSitting) return;
+            if (e.target !== document.body && e.target !== canvas) return;
+            if (e.key === 'w' || e.key === 'W') moveState.w = true;
+            if (e.key === 'a' || e.key === 'A') moveState.a = true;
+            if (e.key === 's' || e.key === 'S') moveState.s = true;
+            if (e.key === 'd' || e.key === 'D') moveState.d = true;
+            if (e.code === 'Space') moveState.space = true;
+            if (e.key === 'Shift' || e.key === 'ShiftLeft' || e.key === 'ShiftRight') moveState.shift = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'e' || e.key === 'E') return;
+            if (isSitting) return;
+            if (e.key === 'w' || e.key === 'W') moveState.w = false;
+            if (e.key === 'a' || e.key === 'A') moveState.a = false;
+            if (e.key === 's' || e.key === 'S') moveState.s = false;
+            if (e.key === 'd' || e.key === 'D') moveState.d = false;
+            if (e.code === 'Space') moveState.space = false;
+            if (e.key === 'Shift' || e.key === 'ShiftLeft' || e.key === 'ShiftRight') moveState.shift = false;
+        });
     const canvas = document.querySelector('#c');
 
     // RENDERER
@@ -39,7 +64,7 @@ function main(){
 
     // SCENE
     const scene = new THREE.Scene();
-    // Set galaxy background with improved clarity
+    // GALAXY BACKGROUND
     const bgLoader = new THREE.TextureLoader();
     bgLoader.load('textures/galaxybackground.jpg', function(texture) {
         texture.colorSpace = THREE.SRGBColorSpace;
@@ -50,12 +75,115 @@ function main(){
         scene.background = texture;
     });
 
+
     // OBJECT LOADER
     const objLoader = new OBJLoader();
 
     const benchX = 0;
     const benchZ = 0;
     const planetRadius = 20;
+
+    // BENCH SIT LOGIC
+    let isSitting = false;
+    let prevCameraPosition = null;
+    let prevCameraQuaternion = null;
+    let benchObject = null;
+    let benchSitPosition = null;
+    let benchLookTarget = null;
+
+    // Interact popup
+    const interactPopup = document.getElementById('interact-popup');
+
+    function isCameraNearBench() {
+        const camPos = camera.position;
+        const benchY = -planetRadius + Math.sqrt(planetRadius * planetRadius - benchX * benchX - benchZ * benchZ);
+        const dist = Math.sqrt(
+            (camPos.x - benchX) ** 2 +
+            (camPos.y - benchY) ** 2 +
+            (camPos.z - benchZ) ** 2
+        );
+        return dist < 15;
+    }
+
+    // Sit on bench
+    function sitOnBench() {
+        // Clear all WASD movement when sitting
+        moveState.w = false;
+        moveState.a = false;
+        moveState.s = false;
+        moveState.d = false;
+        if (!benchObject) return;
+        prevCameraPosition = camera.position.clone();
+        prevCameraQuaternion = camera.quaternion.clone();
+        // Use bounding box to find seat center and height
+        const box = new THREE.Box3().setFromObject(benchObject);
+        // Seat height
+        const seatY = box.max.y - 0.05 * (box.max.y - box.min.y); 
+        // Center of the bench in local coordinates
+        const seatZ = (box.min.z + box.max.z) / 2;
+        const seatX = (box.min.x + box.max.x) / 2;
+        // Sit position: center of bench, on top, but raise Y for head height
+        let localSit = new THREE.Vector3(seatX, seatY + 0.6, seatZ);
+        benchSitPosition = localSit.clone();
+        benchObject.localToWorld(benchSitPosition);
+        camera.position.copy(benchSitPosition);
+        const camDir = new THREE.Vector3(0, 1, 2).applyQuaternion(camera.quaternion);
+        controls.target.copy(benchSitPosition.clone().add(camDir));
+        controls.update();
+        // Allow mouse look, but no pan/zoom
+        controls.enabled = true;
+        controls.enablePan = false;
+        controls.enableZoom = false;
+        controls.minDistance = 0.01;
+        controls.maxDistance = 0.01;
+        controls.minPolarAngle = 0;
+        controls.maxPolarAngle = Math.PI;
+        // Disable WASD movement while sitting
+        moveState.w = false;
+        moveState.a = false;
+        moveState.s = false;
+        moveState.d = false;
+        isSitting = true;
+        // Hide interact popup when sitting
+        if (interactPopup) interactPopup.style.display = 'none';
+    }
+
+    // Stand up from bench
+    function standFromBench() {
+        if (prevCameraPosition && prevCameraQuaternion) {
+            camera.position.copy(prevCameraPosition);
+            camera.quaternion.copy(prevCameraQuaternion);
+        }
+        controls.enabled = true;
+        controls.enablePan = true;
+        controls.enableZoom = true;
+        controls.minDistance = 0.1;
+        controls.maxDistance = 1000;
+        controls.minPolarAngle = 0;
+        controls.maxPolarAngle = Math.PI;
+        isSitting = false;
+    }
+
+    // Toggle sit and stand with E key when near bench
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'e' || e.key === 'E') {
+            if (!isSitting && isCameraNearBench()) {
+                sitOnBench();
+            } else if (isSitting) {
+                standFromBench();
+            }
+        }
+    });
+
+    // Keep camera locked to bench sit position while sitting, but allow mouse look
+    function updateSittingCamera() {
+        if (isSitting && benchSitPosition) {
+            camera.position.copy(benchSitPosition);
+            const camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            controls.target.copy(benchSitPosition.clone().add(camDir));
+            controls.update();
+        }
+    }
 
     // MTL LOADER (BENCH)
     const mtlLoader = new MTLLoader();
@@ -87,13 +215,13 @@ function main(){
             });
             placeOnPlanet(root, benchX, benchZ, planetRadius);
             root.rotation.y = -Math.PI / 2;
-            // Recompute normals after all transforms
             root.traverse((child) => {
                 if (child.isMesh) {
                     child.geometry.computeVertexNormals();
                 }
             });
             scene.add(root);
+            benchObject = root;
         });
     });
 
@@ -147,18 +275,34 @@ function main(){
             lampLight.intensity = 80;
             lampLight.penumbra = 0.7;
 
-            // Find the top of the lamp
+            // FIND LAMP COORINATES FOR LIGHT PLACEMENT
             const lampBoxWorld = new THREE.Box3().setFromObject(root);
             const lampCenter = new THREE.Vector3();
             lampBoxWorld.getCenter(lampCenter);
             const lampTop = new THREE.Vector3(lampCenter.x, lampBoxWorld.max.y, lampCenter.z);
 
-            // Offset the spotlight to the right to be above the bench
             const lampRight = new THREE.Vector3(1, 0, 0);
             lampRight.applyQuaternion(root.quaternion);
             const offsetAmount = 0.8;
-            const lightPos = lampTop.clone().add(lampRight.multiplyScalar(offsetAmount));
+            let lightPos = lampTop.clone().add(lampRight.multiplyScalar(offsetAmount));
+            lightPos.y -= 0.4;
+            lightPos.z += 0.02;
             lampLight.position.copy(lightPos);
+
+            // SPOTLIGHT ORIGIN SPHERE
+            const spotOriginGeometry = new THREE.SphereGeometry(0.22, 32, 32);
+            const spotOriginMaterial = new THREE.MeshStandardMaterial({
+                color: 0xfff7b2,
+                emissive: 0xfff7b2,
+                emissiveIntensity: 7.0,
+                roughness: 0.1,
+                metalness: 0.0,
+                transparent: true,
+                opacity: 0.95
+            });
+            const spotOriginSphere = new THREE.Mesh(spotOriginGeometry, spotOriginMaterial);
+            spotOriginSphere.position.copy(lightPos);
+            scene.add(spotOriginSphere);
 
             const lampDown = new THREE.Vector3(0, -1, 0);
             lampDown.applyQuaternion(root.quaternion);
@@ -185,45 +329,49 @@ function main(){
         object.position.add(normal.multiplyScalar(bottomOffset - 0.02));
     }
 
-    
-    // // PROGRESS BAR AND LOADING MANAGER UI
-    const loadManager = new THREE.LoadingManager();
-    const loader = new THREE.TextureLoader(loadManager);
+    const sphereRadius = 20;
 
-    // PLANET (SPHERE)
-    // Moon position (top right in sky)
+    // PLANET AND MOON
     const moonPos = new THREE.Vector3(10, 25, 10);
     {
-        const sphereRadius = 20;
-
-		// const loader = new THREE.TextureLoader();
-		// const texture = loader.load( 'textures/grass.jpg' );
-		// texture.colorSpace = THREE.SRGBColorSpace;
-		// texture.wrapS = THREE.RepeatWrapping;
-		// texture.wrapT = THREE.RepeatWrapping;
-		// texture.magFilter = THREE.LinearFilter;
-		// texture.minFilter = THREE.LinearMipmapLinearFilter;
-
-		// const repeats = 4;
-		// texture.repeat.set( repeats, repeats );
-        // texture.offset.set(0, 0.25);
-
-		// const sphereGeo = new THREE.SphereGeometry( sphereRadius, 256, 256 );
-		// const planeMat = new THREE.MeshPhongMaterial( {
-		// 	map: texture,
-		// } );
-		// const mesh = new THREE.Mesh( sphereGeo, planeMat );
-		// mesh.position.y = -sphereRadius;
-		// scene.add( mesh );
-
         // PLANET 
-        const material = new THREE.MeshStandardMaterial({color: 0x114f06, roughness: 1, metalness: 0});
-        const sphereGeo = new THREE.SphereGeometry(sphereRadius, 64, 64);
-        const mesh = new THREE.Mesh(sphereGeo, material);
+        const loader = new THREE.TextureLoader();
+        const texture = loader.load('textures/grass2.jpg');
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+
+        // Use a more square repeat ratio to reduce stretching
+        const repeatsX = 8;
+        const repeatsY = 8;
+        texture.repeat.set(repeatsX, repeatsY);
+        texture.offset.set(0, 0.0);
+
+        const sphereGeo = new THREE.SphereGeometry(sphereRadius, 256, 256);
+        const uvs = sphereGeo.attributes.uv;
+        uvs.needsUpdate = true;
+
+        // Use MeshStandardMaterial for better lighting and texture appearance
+        const planetMat = new THREE.MeshStandardMaterial({
+            map: texture,
+            roughness: 0.8,
+            metalness: 0.1
+        });
+        const mesh = new THREE.Mesh(sphereGeo, planetMat);
         mesh.position.y = -sphereRadius;
         mesh.receiveShadow = true;
         scene.add(mesh);
 
+        // const material = new THREE.MeshStandardMaterial({color: 0x114f06, roughness: 1, metalness: 0});
+        // const sphereGeo = new THREE.SphereGeometry(sphereRadius, 64, 64);
+        // const mesh = new THREE.Mesh(sphereGeo, material);
+        // mesh.position.y = -sphereRadius;
+        // mesh.receiveShadow = true;
+        // scene.add(mesh);
+
+        // MOON
         const moonGeo = new THREE.SphereGeometry(3, 48, 48);
         loader.load('textures/moon.jpg', function(moonTexture) {
             moonTexture.colorSpace = THREE.SRGBColorSpace;
@@ -231,38 +379,73 @@ function main(){
             moonTexture.magFilter = THREE.LinearFilter;
             moonTexture.generateMipmaps = true;
             moonTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-            const moonMat = new THREE.MeshStandardMaterial({
-                map: moonTexture,
-                color: 0xffffff,
-                emissive: 0xffffff,
-                emissiveIntensity: 0.3,
-                roughness: 0.3,
-                metalness: 0.0
-            });
-            const moon = new THREE.Mesh(moonGeo, moonMat);
-            moon.position.copy(moonPos);
-            scene.add(moon);
+                const moonMat = new THREE.MeshStandardMaterial({
+                    map: moonTexture,
+                    color: 0xffffff,
+                    emissive: 0xffffff,
+                    emissiveIntensity: 0.4,
+                    roughness: 0.1,
+                    metalness: 0.0
+                });
+                const moon = new THREE.Mesh(moonGeo, moonMat);
+                moon.position.copy(moonPos);
+                scene.add(moon);
 
-            // Store reference for animation
-            window._moonMesh = moon;
+                window._moonMesh = moon;
 
-            // Directional light from the moon, aimed at the planet center
-            const moonDirLight = new THREE.DirectionalLight(0xffffff, 0.4);
-            moonDirLight.position.copy(moonPos);
-            moonDirLight.target.position.set(0, -sphereRadius, 0);
-            scene.add(moonDirLight);
-            scene.add(moonDirLight.target);
+                // HALO EFFECT
+                function createRadialGradientTexture(size = 256) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+                    const gradient = ctx.createRadialGradient(
+                        size / 2, size / 2, 0,
+                        size / 2, size / 2, size / 2
+                    );
+                    gradient.addColorStop(0, 'rgba(255,255,255,0.5)');
+                    gradient.addColorStop(0.5, 'rgba(255,255,255,0.15)');
+                    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, size, size);
+                    const texture = new THREE.Texture(canvas);
+                    texture.needsUpdate = true;
+                    texture.minFilter = THREE.LinearFilter;
+                    texture.magFilter = THREE.LinearFilter;
+                    return texture;
+                }
+
+                const haloGeo = new THREE.SphereGeometry(3.6, 48, 48);
+                const haloTexture = createRadialGradientTexture(256);
+                const haloMat = new THREE.MeshBasicMaterial({
+                    map: haloTexture,
+                    color: 0xffffff,
+                    transparent: true,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                const halo = new THREE.Mesh(haloGeo, haloMat);
+                halo.position.copy(moonPos);
+                scene.add(halo);
+
+                // DIRECTIONAL LIGHT FROM MOON
+                const moonDirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                moonDirLight.position.copy(moonPos);
+                moonDirLight.target.position.set(0, -sphereRadius, 0);
+                scene.add(moonDirLight);
+                scene.add(moonDirLight.target);
         });
 	}
 
     // LIGHTING
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
+
+    const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.1);
+    scene.add(hemisphereLight);
 
     // STARS
     const stars = [];
     function createStarShape() {
-        // 5-pointed star
         const shape = new THREE.Shape();
         const outerRadius = 0.4;
         const innerRadius = 0.18;
@@ -292,15 +475,14 @@ function main(){
     const starGeometry = new THREE.ExtrudeGeometry(starShape, extrudeSettings);
 
     // Place 100 stars randomly scattered around the planet
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 200; i++) {
         const star = new THREE.Mesh(starGeometry, starMaterial);
-        // Random spherical coordinates all around the planet
-        const radius = 22 + Math.random() * 6; // slightly above planet
+        const radius = 60 + Math.random() * 6;
         const theta = Math.random() * Math.PI * 2;
-        const phi = Math.random() * Math.PI; // full sphere
-        const x = Math.cos(theta) * Math.sin(phi) * radius;
-        const y = Math.cos(phi) * radius;
-        const z = Math.sin(theta) * Math.sin(phi) * radius;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const x = radius * Math.sin(phi) * Math.cos(theta);
+        const y = radius * Math.cos(phi) - sphereRadius; // center at (0, -sphereRadius, 0)
+        const z = radius * Math.sin(phi) * Math.sin(theta);
         star.position.set(x, y, z);
         star.rotation.y = Math.random() * Math.PI * 2;
         star.rotation.x = Math.random() * Math.PI * 2;
@@ -335,29 +517,58 @@ function main(){
 			camera.updateProjectionMatrix();
 
 		}
-        
-        time *= 0.001;  // convert time to seconds
-        
-        const delta = 0.016;
-        controls.update(delta);
-        
-        // Animate stars (twinkle effect)
-        stars.forEach((star, ndx) => {
-            const twinkle = 1 + 0.2 * Math.sin(time * 2 + ndx);
-            star.material.emissiveIntensity = 1.2 + 0.8 * twinkle;
-            star.rotation.z += 0.01 * (ndx % 2 === 0 ? 1 : -1);
-        });
+                time *= 0.001;  // convert time to seconds
 
-        // Animate moon rotation
-        if (window._moonMesh) {
-            window._moonMesh.rotation.y += 0.003;
-        }
-		renderer.render( scene, camera );
+                // Show/hide interact popup
+                if (!isSitting && isCameraNearBench()) {
+                    interactPopup.style.display = 'block';
+                } else {
+                    interactPopup.style.display = 'none';
+                }
 
-		requestAnimationFrame( render );
 
-	}
+                // If not sitting: WASD and fly movement
+                if (!isSitting) {
+                    let moveVec = new THREE.Vector3();
+                    const forward = new THREE.Vector3();
+                    camera.getWorldDirection(forward);
+                    forward.y = 0;
+                    forward.normalize();
+                    const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+                    if (moveState.w) moveVec.add(forward);
+                    if (moveState.s) moveVec.add(forward.clone().negate());
+                    if (moveState.a) moveVec.add(right.clone().negate());
+                    if (moveState.d) moveVec.add(right);
+                    if (moveState.space) moveVec.y += 1;
+                    if (moveState.shift) moveVec.y -= 1;
+                    if (moveVec.lengthSq() > 0) {
+                        moveVec.normalize().multiplyScalar(moveSpeed);
+                        camera.position.add(moveVec);
+                        controls.target.add(moveVec);
+                    }
+                } else {
+                    updateSittingCamera();
+                }
 
-	requestAnimationFrame( render );
+                const delta = 0.016;
+                controls.update(delta);
+
+                // Animate stars
+                stars.forEach((star, ndx) => {
+                    const twinkle = 1 + 0.2 * Math.sin(time * 2 + ndx);
+                    star.material.emissiveIntensity = 1.2 + 0.8 * twinkle;
+                    star.rotation.z += 0.01 * (ndx % 2 === 0 ? 1 : -1);
+                });
+
+                // Animate moon rotation
+                if (window._moonMesh) {
+                    window._moonMesh.rotation.y += 0.003;
+                }
+                renderer.render( scene, camera );
+
+                requestAnimationFrame( render );
+            }
+
+            requestAnimationFrame( render );
 }
 main();

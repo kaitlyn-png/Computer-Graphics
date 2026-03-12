@@ -1,3 +1,30 @@
+#controls-ui {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background: rgba(30, 30, 30, 0.92);
+  color: #fff;
+  padding: 18px 28px 18px 22px;
+  border-radius: 12px;
+  font-size: 1.1em;
+  font-family: sans-serif;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.18);
+  z-index: 1100;
+  min-width: 210px;
+}
+#controls-ui h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.2em;
+  letter-spacing: 1px;
+}
+#controls-ui ul {
+  margin: 0;
+  padding-left: 18px;
+}
+#controls-ui li {
+  margin-bottom: 4px;
+  font-size: 1em;
+}
 html, body {
   margin: 0;
   height: 100%;
@@ -18,4 +45,21 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+#interact-popup {
+  position: fixed;
+  left: 50%;
+  bottom: 10%;
+  transform: translateX(-50%);
+  background: rgba(30, 30, 30, 0.92);
+  color: #fff;
+  padding: 16px 32px;
+  border-radius: 12px;
+  font-size: 1.5em;
+  font-family: sans-serif;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+  z-index: 1000;
+  display: none;
+  pointer-events: none;
 }
