@@ -19,15 +19,3 @@ html, body {
     justify-content: center;
     align-items: center;
 }
-#loading .progress {
-    margin: 1.5em;
-    border: 1px solid white;
-    width: 50vw;
-}
-#loading .progressbar {
-    margin: 2px;
-    background: white;
-    height: 1em;
-    transform-origin: top left;
-    transform: scaleX(0);
-}

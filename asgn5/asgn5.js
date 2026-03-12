@@ -27,7 +27,7 @@ function main(){
     const fov = 45;
     const aspect = 2;  // the canvas default
     const near = 0.1;
-    const far = 100;
+    const far = 1000;
     const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
     //camera.position.z = 2;
     camera.position.set(0, 10, 20);
@@ -39,7 +39,16 @@ function main(){
 
     // SCENE
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a1028); // deep night blue
+    // Set galaxy background with improved clarity
+    const bgLoader = new THREE.TextureLoader();
+    bgLoader.load('textures/galaxybackground.jpg', function(texture) {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.minFilter = THREE.LinearMipMapLinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = true;
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        scene.background = texture;
+    });
 
     // OBJECT LOADER
     const objLoader = new OBJLoader();
@@ -135,7 +144,7 @@ function main(){
             lampLight.castShadow = true;
             lampLight.decay = 2;
             lampLight.distance = 60;
-            lampLight.intensity = 40;
+            lampLight.intensity = 80;
             lampLight.penumbra = 0.7;
 
             // Find the top of the lamp
@@ -176,9 +185,14 @@ function main(){
         object.position.add(normal.multiplyScalar(bottomOffset - 0.02));
     }
 
+    
+    // // PROGRESS BAR AND LOADING MANAGER UI
+    const loadManager = new THREE.LoadingManager();
+    const loader = new THREE.TextureLoader(loadManager);
+
     // PLANET (SPHERE)
     // Moon position (top right in sky)
-    const moonPos = new THREE.Vector3(25, 25, 10);
+    const moonPos = new THREE.Vector3(10, 25, 10);
     {
         const sphereRadius = 20;
 
@@ -202,142 +216,98 @@ function main(){
 		// mesh.position.y = -sphereRadius;
 		// scene.add( mesh );
 
+        // PLANET 
         const material = new THREE.MeshStandardMaterial({color: 0x114f06, roughness: 1, metalness: 0});
         const sphereGeo = new THREE.SphereGeometry(sphereRadius, 64, 64);
         const mesh = new THREE.Mesh(sphereGeo, material);
         mesh.position.y = -sphereRadius;
         mesh.receiveShadow = true;
         scene.add(mesh);
-        // Add a glowing moon sphere at the top right (always visible)
-        const moonGeo = new THREE.SphereGeometry(3, 48, 48);
-        const moonMat = new THREE.MeshStandardMaterial({
-            color: 0xfafaff,
-            emissive: 0xffffff,
-            emissiveIntensity: 2.5,
-            roughness: 0.3,
-            metalness: 0.0
-        });
-        const moon = new THREE.Mesh(moonGeo, moonMat);
-        moon.position.copy(moonPos);
-        scene.add(moon);
 
+        const moonGeo = new THREE.SphereGeometry(3, 48, 48);
+        loader.load('textures/moon.jpg', function(moonTexture) {
+            moonTexture.colorSpace = THREE.SRGBColorSpace;
+            moonTexture.minFilter = THREE.LinearMipMapLinearFilter;
+            moonTexture.magFilter = THREE.LinearFilter;
+            moonTexture.generateMipmaps = true;
+            moonTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            const moonMat = new THREE.MeshStandardMaterial({
+                map: moonTexture,
+                color: 0xffffff,
+                emissive: 0xffffff,
+                emissiveIntensity: 0.3,
+                roughness: 0.3,
+                metalness: 0.0
+            });
+            const moon = new THREE.Mesh(moonGeo, moonMat);
+            moon.position.copy(moonPos);
+            scene.add(moon);
+
+            // Store reference for animation
+            window._moonMesh = moon;
+
+            // Directional light from the moon, aimed at the planet center
+            const moonDirLight = new THREE.DirectionalLight(0xffffff, 0.4);
+            moonDirLight.position.copy(moonPos);
+            moonDirLight.target.position.set(0, -sphereRadius, 0);
+            scene.add(moonDirLight);
+            scene.add(moonDirLight.target);
+        });
 	}
 
     // LIGHTING
-  
-    // GEOMETRY
-    const boxWidth = 0.5;
-    const boxHeight = 0.5;
-    const boxDepth = 0.5;
-    const geometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth);
-
-    // LOAD MANAGER
-    const loadManager = new THREE.LoadingManager();
-    const loader = new THREE.TextureLoader(loadManager);
-    // Define texture before any use
-    const texture = loader.load('textures/pink.jpg');
-
-    // LOAD UI
-    const loadingElem = document.querySelector('#loading');
-    const progressBarElem = loadingElem ? loadingElem.querySelector('.progressbar') : null;
-
-    loadManager.onProgress = (urlOfLastItemLoaded, itemsLoaded, itemsTotal) => {
-        const progress = itemsLoaded / itemsTotal;
-        if (progressBarElem) {
-            progressBarElem.style.transform = `scaleX(${progress})`;
-        }
-    };
-
-    loadManager.onLoad = () => {
-        if (loadingElem) {
-            loadingElem.style.display = 'none';
-        }
-    };
-
-    // LIGHTING (night)
-    const ambientLight = new THREE.AmbientLight(0x223355, 0.08);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
-    // Moonlight: bluish-white directional light from the moon
-    const moonLight = new THREE.DirectionalLight(0xbbeeff, 0.7);
-    moonLight.position.copy(moonPos);
-    moonLight.target.position.set(0, 0, 0); // Point at world center
-    scene.add(moonLight.target);
-    moonLight.castShadow = true;
-    scene.add(moonLight);
-    texture.wrapS = THREE.MirroredRepeatWrapping;
-    texture.wrapT = THREE.MirroredRepeatWrapping;
-    texture.repeat.set(2, 2);
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
 
-    const material = new THREE.MeshStandardMaterial({
-        map: texture,
-        color: 0xffffff,
-        metalness: 0.1,
-        roughness: 0.8
-    });
-
-    const materials = [
-        new THREE.MeshStandardMaterial({map: loader.load('textures/pink.jpg'), color: 0xffffff, metalness: 0.1, roughness: 0.8}),
-        new THREE.MeshStandardMaterial({map: loader.load('textures/pink2.jpg'), color: 0xffffff, metalness: 0.1, roughness: 0.8}),
-        new THREE.MeshStandardMaterial({map: loader.load('textures/pink3.jpg'), color: 0xffffff, metalness: 0.1, roughness: 0.8}),
-        new THREE.MeshStandardMaterial({map: loader.load('textures/pink4.png'), color: 0xffffff, metalness: 0.1, roughness: 0.8}),
-        new THREE.MeshStandardMaterial({map: loader.load('textures/pink5.jpg'), color: 0xffffff, metalness: 0.1, roughness: 0.8}),
-        new THREE.MeshStandardMaterial({map: loader.load('textures/pink6.jpg'), color: 0xffffff, metalness: 0.1, roughness: 0.8}),
-    ];
-
-
-    // CUBES
-    const cubes = [
-        makeInstance(geometry, 0x44aa88,  0),
-        makeInstance(geometry, 0x8844aa, 1),
-        makeInstance(geometry, 0xaa8844,  -1),
-        makeTexturedInstance(geometry, material, 2),
-    ];
-
-    loadManager.onLoad = () => {
-        if (loadingElem) {
-            loadingElem.style.display = 'none';
+    // STARS
+    const stars = [];
+    function createStarShape() {
+        // 5-pointed star
+        const shape = new THREE.Shape();
+        const outerRadius = 0.4;
+        const innerRadius = 0.18;
+        const spikes = 5;
+        let rot = Math.PI / 2 * 3;
+        let x = 0;
+        let y = 0;
+        const step = Math.PI / spikes;
+        shape.moveTo(0, -outerRadius);
+        for (let i = 0; i < spikes; i++) {
+            x = Math.cos(rot) * outerRadius;
+            y = Math.sin(rot) * outerRadius;
+            shape.lineTo(x, y);
+            rot += step;
+            x = Math.cos(rot) * innerRadius;
+            y = Math.sin(rot) * innerRadius;
+            shape.lineTo(x, y);
+            rot += step;
         }
-        const cube = makeTexturedInstance(geometry, materials, -2);
-        cubes.push(cube);
-    };
-
-    function makeInstance(geometry, color, x) {
-        const material = new THREE.MeshStandardMaterial({color, metalness: 0.1, roughness: 0.8});
-        const cube = new THREE.Mesh(geometry, material);
-        cube.castShadow = true;
-        cube.receiveShadow = true;
-        scene.add(cube);
-        const z = 0;
-        const y = -20 + Math.sqrt(400 - x*x - z*z);
-        cube.position.set(x, y, z);
-        const normal = new THREE.Vector3(x, y + 20, z).normalize();
-        const up = new THREE.Vector3(0, 1, 0);
-        const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal);
-        cube.setRotationFromQuaternion(quaternion);
-        return cube;
+        shape.lineTo(0, -outerRadius);
+        return shape;
     }
 
-    function makeTexturedInstance(geometry, material, x) {
-        let mat = material;
-        if (Array.isArray(material)) {
-            mat = material.map(m => new THREE.MeshStandardMaterial({map: m.map, color: 0xffffff, metalness: 0.1, roughness: 0.8}));
-        } else if (material instanceof THREE.Material) {
-            mat = new THREE.MeshStandardMaterial({map: material.map, color: 0xffffff, metalness: 0.1, roughness: 0.8});
-        }
-        const cube = new THREE.Mesh(geometry, mat);
-        cube.castShadow = true;
-        cube.receiveShadow = true;
-        scene.add(cube);
-        const z = 0;
-        const y = -20 + Math.sqrt(400 - x*x - z*z);
-        cube.position.set(x, y, z);
-        const normal = new THREE.Vector3(x, y + 20, z).normalize();
-        const up = new THREE.Vector3(0, 1, 0);
-        const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal);
-        cube.setRotationFromQuaternion(quaternion);
-        return cube;
+    const starShape = createStarShape();
+    const extrudeSettings = { depth: 0.1, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 2 };
+    const starMaterial = new THREE.MeshStandardMaterial({ color: 0xffff44, emissive: 0xffff99, emissiveIntensity: 1.5, metalness: 0.2, roughness: 0.5 });
+    const starGeometry = new THREE.ExtrudeGeometry(starShape, extrudeSettings);
+
+    // Place 100 stars randomly scattered around the planet
+    for (let i = 0; i < 100; i++) {
+        const star = new THREE.Mesh(starGeometry, starMaterial);
+        // Random spherical coordinates all around the planet
+        const radius = 22 + Math.random() * 6; // slightly above planet
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI; // full sphere
+        const x = Math.cos(theta) * Math.sin(phi) * radius;
+        const y = Math.cos(phi) * radius;
+        const z = Math.sin(theta) * Math.sin(phi) * radius;
+        star.position.set(x, y, z);
+        star.rotation.y = Math.random() * Math.PI * 2;
+        star.rotation.x = Math.random() * Math.PI * 2;
+        star.castShadow = false;
+        star.receiveShadow = false;
+        scene.add(star);
+        stars.push(star);
     }
 
 	function resizeRendererToDisplaySize( renderer ) {
@@ -371,12 +341,17 @@ function main(){
         const delta = 0.016;
         controls.update(delta);
         
-        cubes.forEach((cube, ndx) => {
-            const speed = 1 + ndx * .1;
-            const rot = time * speed;
-            cube.rotation.x = rot;
-            cube.rotation.y = rot;
-        });;
+        // Animate stars (twinkle effect)
+        stars.forEach((star, ndx) => {
+            const twinkle = 1 + 0.2 * Math.sin(time * 2 + ndx);
+            star.material.emissiveIntensity = 1.2 + 0.8 * twinkle;
+            star.rotation.z += 0.01 * (ndx % 2 === 0 ? 1 : -1);
+        });
+
+        // Animate moon rotation
+        if (window._moonMesh) {
+            window._moonMesh.rotation.y += 0.003;
+        }
 		renderer.render( scene, camera );
 
 		requestAnimationFrame( render );
